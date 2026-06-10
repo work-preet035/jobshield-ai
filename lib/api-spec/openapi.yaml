@@ -1,0 +1,311 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: JobShield AI - Cybersecurity scam detection API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: analysis
+    description: Scam analysis operations
+  - name: stats
+    description: Statistics and summary operations
+  - name: indicators
+    description: Detection indicator operations
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /analyses:
+    get:
+      operationId: listAnalyses
+      tags: [analysis]
+      summary: List all analyses
+      description: Get paginated history of scam analyses
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: threatLevel
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+      responses:
+        "200":
+          description: List of analyses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Analysis"
+    post:
+      operationId: createAnalysis
+      tags: [analysis]
+      summary: Submit content for scam analysis
+      description: Analyze recruiter message, job posting, or LinkedIn message for scam indicators
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalysisInput"
+      responses:
+        "201":
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Analysis"
+        "400":
+          description: Invalid input
+
+  /analyses/recent:
+    get:
+      operationId: getRecentAnalyses
+      tags: [analysis]
+      summary: Get recent analyses
+      description: Get the 5 most recent analyses for the activity feed
+      responses:
+        "200":
+          description: Recent analyses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Analysis"
+
+  /analyses/{id}:
+    get:
+      operationId: getAnalysis
+      tags: [analysis]
+      summary: Get a specific analysis
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Analysis detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Analysis"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteAnalysis
+      tags: [analysis]
+      summary: Delete an analysis
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Get summary statistics
+      description: Returns total scans, average risk score, threat level distribution, and top red flags
+      responses:
+        "200":
+          description: Statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stats"
+
+  /indicators:
+    get:
+      operationId: listIndicators
+      tags: [indicators]
+      summary: List all detection indicators
+      description: Returns all scam detection rules with descriptions and severity
+      responses:
+        "200":
+          description: List of indicators
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Indicator"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    AnalysisInput:
+      type: object
+      required: [content, contentType]
+      properties:
+        content:
+          type: string
+          minLength: 10
+          description: The text content to analyze (recruiter message, job posting, etc.)
+        contentType:
+          type: string
+          enum: [recruiter_message, job_posting, linkedin_message, email, other]
+          description: Type of content being analyzed
+        source:
+          type: ["string", "null"]
+          description: Optional source label (e.g. company name, platform)
+
+    RedFlag:
+      type: object
+      required: [id, category, description, severity, matched]
+      properties:
+        id:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        matched:
+          type: boolean
+        matchedText:
+          type: ["string", "null"]
+
+    Analysis:
+      type: object
+      required: [id, content, contentType, riskScore, threatLevel, redFlags, recommendations, summary, createdAt]
+      properties:
+        id:
+          type: integer
+        content:
+          type: string
+        contentType:
+          type: string
+          enum: [recruiter_message, job_posting, linkedin_message, email, other]
+        source:
+          type: ["string", "null"]
+        riskScore:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Risk score from 0 (safe) to 100 (definitely scam)
+        threatLevel:
+          type: string
+          enum: [low, medium, high, critical]
+          description: "low: 0-25, medium: 26-50, high: 51-75, critical: 76-100"
+        redFlags:
+          type: array
+          items:
+            $ref: "#/components/schemas/RedFlag"
+        recommendations:
+          type: array
+          items:
+            type: string
+          description: Actionable recommendations based on findings
+        summary:
+          type: string
+          description: Human-readable explanation of the findings
+        createdAt:
+          type: string
+          format: date-time
+
+    ThreatLevelCount:
+      type: object
+      required: [level, count]
+      properties:
+        level:
+          type: string
+          enum: [low, medium, high, critical]
+        count:
+          type: integer
+
+    TopRedFlag:
+      type: object
+      required: [category, count]
+      properties:
+        category:
+          type: string
+        count:
+          type: integer
+
+    Stats:
+      type: object
+      required: [totalScans, avgRiskScore, threatLevelCounts, topRedFlags, safeCount, scamCount]
+      properties:
+        totalScans:
+          type: integer
+        avgRiskScore:
+          type: number
+        safeCount:
+          type: integer
+          description: Analyses with low threat level
+        scamCount:
+          type: integer
+          description: Analyses with high or critical threat level
+        threatLevelCounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ThreatLevelCount"
+        topRedFlags:
+          type: array
+          items:
+            $ref: "#/components/schemas/TopRedFlag"
+
+    Indicator:
+      type: object
+      required: [id, category, name, description, severity, examples]
+      properties:
+        id:
+          type: string
+        category:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        examples:
+          type: array
+          items:
+            type: string

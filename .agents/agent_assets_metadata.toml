@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "_s14ggkAYgrPhYTU8jlVm"
+uri = "file://jobshield-ai.tar.gz"
+type = "unspecified"
+title = "jobshield-ai.tar.gz — Full project source"
